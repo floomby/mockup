@@ -7,9 +7,9 @@ import "./ERC721.sol";
 import "./ERC721Enumerable.sol";
 import "./ERC721Burnable.sol";
 import "./ERC721Pausable.sol";
-import "../AccessControlEnumerable.sol";
-import "../Context.sol";
-import "../Counters.sol";
+import "../deps/AccessControlEnumerable.sol";
+import "../deps/Context.sol";
+import "../deps/Counters.sol";
 
 /**
  * @dev {ERC721} token, including:

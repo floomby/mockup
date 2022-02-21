@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "./ERC20Burnable.sol";
-import "../AccessControlEnumerable.sol";
+import "../deps/AccessControlEnumerable.sol";
 
 abstract contract AeroName {
     string constant _aeroName = "Aero tokens";

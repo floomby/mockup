@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../Context.sol";
-import "../Strings.sol";
-import "../airports/ERC721PresetMinterPauserAutoId.sol";
+import "../deps/Context.sol";
+import "../deps/Strings.sol";
 
+import "../airports/ERC721PresetMinterPauserAutoId.sol";
 import "../aero/Aero.sol";
 
 // Having this be a erc721 is overkill probably

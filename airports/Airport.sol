@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "./ERC721PresetMinterPauserAutoId.sol";
-import "../Counters.sol";
+import "../deps/Counters.sol";
 
 import "../aero/Aero.sol";
 

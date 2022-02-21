@@ -40,7 +40,7 @@ contract ERC721PresetMinterPauserAutoId is
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
-    Counters.Counter private _tokenIdTracker;
+    Counters.Counter internal _tokenIdTracker;
 
     string private _baseTokenURI;
 

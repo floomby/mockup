@@ -9,7 +9,8 @@ abstract contract AeroName {
 }
 
 contract Aero is ERC20Burnable, AeroName, AccessControlEnumerable {
-    bytes32 public constant ROUTE_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant ROUTE_ROLE = keccak256("ROUTE_ROLE");
+    bytes32 public constant AIRPORT_ROLE = keccak256("AIRPORT_ROLE");
 
     constructor(uint256 initialSupply) ERC20(_aeroName, "AERO") {
         _mint(_msgSender(), initialSupply);
@@ -22,9 +23,21 @@ contract Aero is ERC20Burnable, AeroName, AccessControlEnumerable {
         _setupRole(ROUTE_ROLE, routeAddress);
     }
 
-    function pay(address to, uint256 ammount) public {
-        require(hasRole(ROUTE_ROLE, _msgSender()), "Must have route role to issue payment");
-        _mint(to, ammount);
+    function setAirportAddress(address airportAddress) public {
+        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Must have admin role to set airport contract address");
+        _setupRole(AIRPORT_ROLE, airportAddress);
+    }
+
+    // This seems the wrong way to do this
+    // function pay(address to, uint256 ammount) public {
+    //     require(hasRole(ROUTE_ROLE, _msgSender()), "Must have route role to issue payment");
+    //     _mint(to, ammount);
+    // }
+
+    function burnFrom(address account, uint256 amount) public virtual override {
+        address sender = _msgSender();
+        if (!hasRole(ROUTE_ROLE, sender) && !hasRole(AIRPORT_ROLE, sender)) _spendAllowance(account, sender, amount);
+        _burn(account, amount);
     }
 
     // TODO Implement function to purchase aero

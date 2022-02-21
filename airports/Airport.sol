@@ -6,7 +6,7 @@ import "../Counters.sol";
 
 import "../aero/Aero.sol";
 
-contract Airport is ERC721PresetMinterPauserAutoId {
+contract Airport is ERC721PresetMinterPauserAutoId, CheckAero {
     Aero private _aero;
 
     using Counters for Counters.Counter;
@@ -18,8 +18,8 @@ contract Airport is ERC721PresetMinterPauserAutoId {
     mapping(uint256 => uint16) private _runways;
 
     constructor(string memory baseURI, address aeroContractAddress) ERC721PresetMinterPauserAutoId("Airport nft", "ARPRT", baseURI) {
-        // TODO It would be good to check that the aero contract is deployed properly here
         _aero = Aero(aeroContractAddress);
+        require(isAeroContract(_aero), "Must provide a valid aero contract");
     }
 
     function runwayCount(uint256 tokenId) public view returns (uint16) {

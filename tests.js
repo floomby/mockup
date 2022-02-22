@@ -64,7 +64,7 @@ const deployContracts = async (cb) => {
     aero = { address: aeroAddress, contract: new web3.eth.Contract(contracts.aero_abi, aeroAddress) };
     console.log("deployed aero");
 
-    const airportAddress = await deployContract(contracts.airport_abi, contracts.airport_bin, ['airportmetadatauri', aeroAddress]);
+    const airportAddress = await deployContract(contracts.airport_abi, contracts.airport_bin, ['airportmetadatauri?id=', aeroAddress]);
     airport = { address: airportAddress, contract: new web3.eth.Contract(contracts.airport_abi, airportAddress) };
     console.log("deployed airport");
     await callMethod(aero.contract.methods.setAirportAddress(airportAddress), adminAccount);
@@ -80,12 +80,14 @@ const deployContracts = async (cb) => {
 
 const gasPrice = new BN(web3.utils.toWei('30', 'gwei'), 10);
 
-// TODO figure out the best way to represent testing behaviors
+// TODO figure out the best way to represent testing behaviors (also important to test that error behavior maintains correct contract states)
 const runTests = async () => {
-    console.log("make sure minting airports");
+    console.log("check airport minting");
     await callMethod(airport.contract.methods.mint(testAccount.address), adminAccount);
     let count = await airport.contract.methods.totalSupply().call();
     assert(count === '1');
+    let uri = await airport.contract.methods.tokenURI(0).call();
+    assert(uri === 'airportmetadatauri?id=0');
 
     console.log("check purchasing aero");
     await callMethod(aero.contract.methods.purchase(), testAccount, '1000');
@@ -113,6 +115,13 @@ const runTests = async () => {
     let accountBalanceAfter = new BN(await web3.eth.getBalance(adminAccount.address), 10);
     let delta = gasPrice.mul(gasUsed).sub(accountBalanceBefore.sub(accountBalanceAfter));
     assert(delta.toString() === '1000');
+
+    console.log("check route acquisition");
+    await callMethod(route.contract.methods.buyRoute(), testAccount);
+    count = await route.contract.methods.totalSupply().call();
+    assert(count === '1');
+    uri = await route.contract.methods.tokenURI(0).call();
+    assert(uri === 'routemetadatauri?length=42&routeType=1&aircraftType=0');
 
     console.log("tests passed");
     process.exit(0);

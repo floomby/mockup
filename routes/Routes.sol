@@ -29,8 +29,7 @@ contract Route is ERC721PresetMinterPauserAutoId, CheckAero {
     }
 
     // We don't want routes to be minted like normal
-    function mint(address to) public virtual override {
-        revert();
+    function mint(address /*to*/) public virtual override {
     }
 
     function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {

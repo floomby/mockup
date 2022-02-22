@@ -12,10 +12,11 @@ contract Aero is ERC20Burnable, AeroName, AccessControlEnumerable {
     bytes32 public constant ROUTE_ROLE = keccak256("ROUTE_ROLE");
     bytes32 public constant AIRPORT_ROLE = keccak256("AIRPORT_ROLE");
 
-    constructor(uint256 initialSupply) ERC20(_aeroName, "AERO") {
-        _mint(_msgSender(), initialSupply);
+    // The way this is written this needs to be deployed by the admin account which is needed for withdrawals
+    constructor() ERC20(_aeroName, "AERO") {
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
-        _setupRole(ROUTE_ROLE, _msgSender());
+        // _setupRole(ROUTE_ROLE, _msgSender());
+        // _setupRole(AIRPORT_ROLE, _msgSender());
     }
 
     function setRouteAddress(address routeAddress) public {
@@ -28,19 +29,24 @@ contract Aero is ERC20Burnable, AeroName, AccessControlEnumerable {
         _setupRole(AIRPORT_ROLE, airportAddress);
     }
 
-    // This seems the wrong way to do this
-    // function pay(address to, uint256 ammount) public {
-    //     require(hasRole(ROUTE_ROLE, _msgSender()), "Must have route role to issue payment");
-    //     _mint(to, ammount);
-    // }
-
     function burnFrom(address account, uint256 amount) public virtual override {
         address sender = _msgSender();
         if (!hasRole(ROUTE_ROLE, sender) && !hasRole(AIRPORT_ROLE, sender)) _spendAllowance(account, sender, amount);
         _burn(account, amount);
     }
 
-    // TODO Implement function to purchase aero
+    // TODO This is very much not the way we want to do it (locking the tokens to a existing cryptocurrency seems undesirerable)
+    function purchase() public payable {
+        _mint(_msgSender(), msg.value);
+    }
+
+    function withdraw() public {
+        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Withdrawals only allowed by admin account");
+        (bool success, ) = payable(_msgSender()).call{value: address(this).balance}("");
+        require(success, "Failed to withdraw");
+    }
+
+    // TODO need a way to award aero to completed routes
 }
 
 contract CheckAero is AeroName {

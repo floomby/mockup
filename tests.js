@@ -1,5 +1,6 @@
 const Web3 = require('web3');
 const assert = require('assert');
+const BN = require('bn.js');
 // ganache
 const web3 = new Web3('HTTP://127.0.0.1:7545');
 
@@ -33,20 +34,21 @@ const deployContract = async (abi, bin, args) => {
     });
 };
 
-const callMethod = (closure, account) => {
+const callMethod = (closure, account, amount) => {
     return new Promise((resolve, reject) => {
         closure.estimateGas({ from: account.address }, (err, gas) => {
             if (err) return reject(err);
             closure.send({
                 from: account.address,
                 gas: 200000,
-                gasPrice: web3.utils.toWei('30', 'gwei')
+                gasPrice: web3.utils.toWei('30', 'gwei'),
+                value: amount === undefined ? '0' : amount
             }, (error, transactionHash) => { /* console.dir(['sending', error, transactionHash]); */ })
             .on('transactionHash', hash => { /* console.dir(['txhash', hash]); */ })
             .on('confirmation', (confirmationNumber, receipt) => {
                 if (confirmationNumber === 1) {
                     // console.dir(['confirmation', confirmationNumber, receipt]);
-                    resolve();
+                    resolve(receipt.gasUsed);
                 }
             })
             .on('receipt', receipt => { /* console.dir(['receipt', receipt]); */ })
@@ -55,11 +57,10 @@ const callMethod = (closure, account) => {
     });
 };
 
-const initialAeroCount = 5000;
 let aero = {}, airport = {}, route = {};
 
 const deployContracts = async (cb) => {
-    const aeroAddress = await deployContract(contracts.aero_abi, contracts.aero_bin, [initialAeroCount]);
+    const aeroAddress = await deployContract(contracts.aero_abi, contracts.aero_bin, []);
     aero = { address: aeroAddress, contract: new web3.eth.Contract(contracts.aero_abi, aeroAddress) };
     console.log("deployed aero");
 
@@ -77,20 +78,42 @@ const deployContracts = async (cb) => {
     if(cb) cb();
 };
 
+const gasPrice = new BN(web3.utils.toWei('30', 'gwei'), 10);
+
 // TODO figure out the best way to represent testing behaviors
 const runTests = async () => {
-    // Do basic sanity checks to make sure minting airports works
+    console.log("make sure minting airports");
     await callMethod(airport.contract.methods.mint(testAccount.address), adminAccount);
     let count = await airport.contract.methods.totalSupply().call();
     assert(count === '1');
-    await callMethod(aero.contract.methods.transfer(testAccount.address, 1000), adminAccount);
+
+    console.log("check purchasing aero");
+    await callMethod(aero.contract.methods.purchase(), testAccount, '1000');
     count = await aero.contract.methods.balanceOf(testAccount.address).call();
     assert(count === '1000');
+
+    console.log("check purchasing runways");
     await callMethod(airport.contract.methods.addRunway(0), testAccount);
     count = await aero.contract.methods.balanceOf(testAccount.address).call();
     assert(count === '900');
+
+    console.log("check things burned properly when purchasing");
     count = await aero.contract.methods.totalSupply().call();
-    assert(count === `${initialAeroCount - 100}`);
+    assert(count === '900');
+
+    console.log("check admin account balance");
+    count = await web3.eth.getBalance(aero.address);
+    assert(count === '1000');
+
+    console.log("check withdrawals");
+    let accountBalanceBefore = new BN(await web3.eth.getBalance(adminAccount.address), 10);
+    let gasUsed = new BN(await callMethod(aero.contract.methods.withdraw(), adminAccount), 10);
+    count = await web3.eth.getBalance(aero.address);
+    assert(count === '0');
+    let accountBalanceAfter = new BN(await web3.eth.getBalance(adminAccount.address), 10);
+    let delta = gasPrice.mul(gasUsed).sub(accountBalanceBefore.sub(accountBalanceAfter));
+    assert(delta.toString() === '1000');
+
     console.log("tests passed");
     process.exit(0);
 };

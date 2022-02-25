@@ -57,7 +57,7 @@ const callMethod = (closure, account, amount) => {
     });
 };
 
-let aero = {}, airport = {}, route = {}, oraclinator = {};
+let aero = {}, airport = {}, route = {}, oracle = {};
 
 const options = {
     filter: {
@@ -66,20 +66,29 @@ const options = {
     fromBlock: 0
 };
 
-const addEventPrinter = eventObject => {
+let addedRoutes = [];
+
+const addRoutes = (event) => {
+    addedRoutes.push(event);
+};
+
+const addEventPrinter = (eventObject, cb) => {
     eventObject(options)
-        .on('data', event => console.log(event))
+        .on('data', event => {
+            console.log(event);
+            if (cb) cb(event);
+        })
         .on('changed', changed => console.log(changed))
         .on('error', err => { throw err; })
         .on('connected', str => console.log(str));
 };
 
-const oraclinatorHandler = () => {
-    oraclinator.contract.events.getValue(options)
+const oracleHandler = () => {
+    oracle.contract.events.getValue(options)
         .on('data', async event => {
             console.dir(['data', event]);
             try {
-                const contract = new web3.eth.Contract(contracts.ioraclinatorable_abi, event.returnValues.from);
+                const contract = new web3.eth.Contract(contracts.ioraclable_abi, event.returnValues.from);
                 const res = await got(event.returnValues.what).json();
                 // console.dir(res);
                 await callMethod(contract.methods.__callback(res.toString(), event.returnValues.id), adminAccount);
@@ -97,8 +106,8 @@ const deployContracts = async (cb) => {
     aero = { address: aeroAddress, contract: new web3.eth.Contract(contracts.aero_abi, aeroAddress) };
     console.log("deployed aero");
 
-    const oraclinatorAddress = await deployContract(contracts.oraclinator_abi, contracts.oraclinator_bin, []);
-    oraclinator = { address: oraclinatorAddress, contract: new web3.eth.Contract(contracts.oraclinator_abi, oraclinatorAddress) };
+    const oracleAddress = await deployContract(contracts.oracle_abi, contracts.oracle_bin, []);
+    oracle = { address: oracleAddress, contract: new web3.eth.Contract(contracts.oracle_abi, oracleAddress) };
     console.log("deployed oracle");
 
     const airportAddress = await deployContract(contracts.airport_abi, contracts.airport_bin, ['airportmetadatauri?id=', aeroAddress]);
@@ -106,17 +115,17 @@ const deployContracts = async (cb) => {
     console.log("deployed airport");
     await callMethod(aero.contract.methods.setAirportAddress(airportAddress), adminAccount);
     
-    const routeAddress = await deployContract(contracts.route_abi, contracts.route_bin, ['routemetadatauri', aeroAddress, oraclinatorAddress]);
+    const routeAddress = await deployContract(contracts.route_abi, contracts.route_bin, ['routemetadatauri', aeroAddress, oracleAddress]);
     route = { address: routeAddress, contract: new web3.eth.Contract(contracts.route_abi, routeAddress) };
     console.log("deployed route");
     await callMethod(aero.contract.methods.setRouteAddress(routeAddress), adminAccount);
 
-    oraclinatorHandler();
+    oracleHandler();
 
     addEventPrinter(route.contract.events.log);
-    addEventPrinter(route.contract.events.routeAdded);
+    addEventPrinter(route.contract.events.routeAdded, addRoutes);
 
-    console.dir([aero, airport, route, oraclinator].map(x => x.address));
+    console.dir([aero, airport, route, oracle].map(x => x.address));
     if(cb) cb();
 };
 
@@ -162,14 +171,15 @@ const runTests = async () => {
 
     console.log("check route acquisition");
     await callMethod(route.contract.methods.buyRoute(), testAccount);
-    // count = await route.contract.methods.totalSupply().call();
-    // assert(count === '1');
-    // uri = await route.contract.methods.tokenURI(0).call();
-    // assert(uri === 'routemetadatauri?length=42&routeType=1&aircraftType=0');
+    // TODO fix this waiting, it is not ideal
+    await new Promise(r => setTimeout(r, 10000));
+    assert(addedRoutes.length === 1);
+    uri = await route.contract.methods.tokenURI(0).call();
+    assert(uri === 'routemetadatauri?length=42&routeType=1&aircraftType=0');
 
     console.log("tests passed");
     console.log(`Took ${(Date.now() - start) / 1000} seconds`);
-    // process.exit(0);
+    process.exit(0);
 };
 
 deployContracts(runTests);

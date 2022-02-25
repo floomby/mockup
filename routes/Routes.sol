@@ -7,11 +7,11 @@ import "../deps/Strings.sol";
 import "../airports/ERC721PresetMinterPauserAutoId.sol";
 import "../aero/Aero.sol";
 
-import "../oraclinator/IOraclinatorable.sol";
-import "../oraclinator/Oraclinator.sol";
+import "../oracle/IOraclable.sol";
+import "../oracle/Oracle.sol";
 
 // Having this be a erc721 is overkill probably
-contract Route is ERC721PresetMinterPauserAutoId, CheckAero, IOraclinatorable {
+contract Route is ERC721PresetMinterPauserAutoId, CheckAero, IOraclable {
     event routeAdded(uint256 tokenId);
     event log(string message);
 
@@ -20,7 +20,7 @@ contract Route is ERC721PresetMinterPauserAutoId, CheckAero, IOraclinatorable {
     Aero private _aero;
     using Counters for Counters.Counter;
 
-    address private _oraclinator;
+    address private _oracle;
     uint256 private _oracle_id;
     mapping(uint256 => address) private _routesInLimbo;
 
@@ -31,10 +31,10 @@ contract Route is ERC721PresetMinterPauserAutoId, CheckAero, IOraclinatorable {
     }
     mapping(uint256 => RouteData) private _routeData;
 
-    constructor(string memory baseURI, address aeroContractAddress, address oraclinator) ERC721PresetMinterPauserAutoId("Routes", "RTS", baseURI) {
+    constructor(string memory baseURI, address aeroContractAddress, address oracle) ERC721PresetMinterPauserAutoId("Routes", "RTS", baseURI) {
         _aero = Aero(aeroContractAddress);
         require(isAeroContract(_aero), "Must provide a valid aero contract");
-        _oraclinator = oraclinator;
+        _oracle = oracle;
     }
 
     function buyRoute() public {
@@ -44,7 +44,7 @@ contract Route is ERC721PresetMinterPauserAutoId, CheckAero, IOraclinatorable {
         }
         _routesInLimbo[_oracle_id] = msg.sender;
 
-        Oraclinator(_oraclinator).oraclinatorQuery("http://localhost:3000/prng", _oracle_id);
+        Oracle(_oracle).oracleQuery("http://localhost:3000/prng", _oracle_id);
     }
 
     // We don't want routes to be minted like normal

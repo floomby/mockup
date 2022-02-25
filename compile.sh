@@ -23,10 +23,10 @@ printf ",\n    airport_bin: \"0x" >> compiled.js
 solc --bin airports/Airport.sol | sed -n '/airports\/Airport.sol:Airport /{n;n;p}' | sed -z '$ s/\n$//' >> compiled.js
 printf "\",\n" >> compiled.js
 
-printf "    ioraclinatorable_abi: " >> compiled.js
-solc --abi oraclinator/IOraclinatorable.sol | sed -n '/oraclinator\/IOraclinatorable.sol:IOraclinatorable /{n;n;p}' | sed -z '$ s/\n$//' >> compiled.js
-printf ",\n    oraclinator_abi: " >> compiled.js
-solc --abi oraclinator/Oraclinator.sol | sed -n '/oraclinator\/Oraclinator.sol:Oraclinator /{n;n;p}' | sed -z '$ s/\n$//' >> compiled.js
-printf ",\n    oraclinator_bin: \"0x" >> compiled.js
-solc --bin oraclinator/Oraclinator.sol | sed -n '/oraclinator\/Oraclinator.sol:Oraclinator /{n;n;p}' | sed -z '$ s/\n$//' >> compiled.js
+printf "    ioraclable_abi: " >> compiled.js
+solc --abi oracle/IOraclable.sol | sed -n '/oracle\/IOraclable.sol:IOraclable /{n;n;p}' | sed -z '$ s/\n$//' >> compiled.js
+printf ",\n    oracle_abi: " >> compiled.js
+solc --abi oracle/Oracle.sol | sed -n '/oracle\/Oracle.sol:Oracle /{n;n;p}' | sed -z '$ s/\n$//' >> compiled.js
+printf ",\n    oracle_bin: \"0x" >> compiled.js
+solc --bin oracle/Oracle.sol | sed -n '/oracle\/Oracle.sol:Oracle /{n;n;p}' | sed -z '$ s/\n$//' >> compiled.js
 printf "\"\n}\n" >> compiled.js

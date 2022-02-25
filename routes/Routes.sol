@@ -55,6 +55,27 @@ contract Route is ERC721PresetMinterPauserAutoId, CheckAero, IOraclable {
         // Oracle(_oracle).oracleQuery("http://localhost:3000/prng", _oracle_id);
     }
 
+    function stringToUint32(string memory str) pure private returns (uint32 result) {
+        bytes memory bts = bytes(str);
+        uint32 i;
+        result = 0;
+        for (i = 0; i < bts.length; i++) {
+            uint32 c = uint32(uint8(bts[i]));
+            if (c >= 48 && c <= 57) {
+                result = result * 10 + (c - 48);
+            }
+        }
+        return result;
+    }
+
+    // I grabbed the parameters from a table on https://en.wikipedia.org/wiki/Linear_congruential_generator
+    // The domain matches the output of the prng in the backend so doing this is fine (all we care about is the statistics of this anyways)
+    function nextLcgValue(uint32 value) pure private returns (uint32) {
+        unchecked {
+            return value * 1664525 + 1013904223;
+        }
+    }
+
     // We don't want routes to be minted like normal
     function mint(address /*to*/) public virtual override {
     }
@@ -79,13 +100,16 @@ contract Route is ERC721PresetMinterPauserAutoId, CheckAero, IOraclable {
         require(msg.sender == _oracleCallbackAddress, "Callback called from invalid callback address");
         emit log(value);
         require(_routesInLimbo[id] != address(0), "Invalid route callback");
+
+        uint32 num1 = stringToUint32(value);
+        uint32 num2 = nextLcgValue(num1);
+        uint32 num3 = nextLcgValue(num2);
+
         uint256 tokenId = _tokenIdTracker.current();
 
         address sender = _routesInLimbo[id];
         _mint(sender, tokenId);
-        // TODO somehow we need to set route properties (I just make something default for now)
-        // Some of this could have an element of randomness, maybe you don't quite know if how good the route is and you are trying to get lucky
-        _routeData[tokenId] = RouteData(42, RouteType.COMMERCIAL, AircraftType.JET);
+        _routeData[tokenId] = RouteData(num1 % 100, RouteType(num2 % uint32(type(RouteType).max)), AircraftType(num3 % uint32(type(AircraftType).max)));
         _tokenIdTracker.increment();
         // I think? a fail to burn will cause reversion even if we fail to burn cause out of gas (we aren't using call)
         // Idk I should look up exact behavior though to be sure

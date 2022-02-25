@@ -21,6 +21,7 @@ contract Route is ERC721PresetMinterPauserAutoId, CheckAero, IOraclable {
     using Counters for Counters.Counter;
 
     address private _oracle;
+    address private _oracleCallbackAddress;
     uint256 private _oracle_id;
     mapping(uint256 => address) private _routesInLimbo;
 
@@ -31,10 +32,12 @@ contract Route is ERC721PresetMinterPauserAutoId, CheckAero, IOraclable {
     }
     mapping(uint256 => RouteData) private _routeData;
 
-    constructor(string memory baseURI, address aeroContractAddress, address oracle) ERC721PresetMinterPauserAutoId("Routes", "RTS", baseURI) {
+    constructor(string memory baseURI, address aeroContractAddress, address oracle, address oracleCallbackAddress) 
+        ERC721PresetMinterPauserAutoId("Routes", "RTS", baseURI) {
         _aero = Aero(aeroContractAddress);
         require(isAeroContract(_aero), "Must provide a valid aero contract");
         _oracle = oracle;
+        _oracleCallbackAddress = oracleCallbackAddress;
     }
 
     function buyRoute() public {
@@ -45,6 +48,11 @@ contract Route is ERC721PresetMinterPauserAutoId, CheckAero, IOraclable {
         _routesInLimbo[_oracle_id] = msg.sender;
 
         Oracle(_oracle).oracleQuery("http://localhost:3000/prng", _oracle_id);
+        // To test concurrent transactions
+        // Oracle(_oracle).oracleQuery("http://localhost:3000/prng", _oracle_id);
+        // Oracle(_oracle).oracleQuery("http://localhost:3000/prng", _oracle_id);
+        // Oracle(_oracle).oracleQuery("http://localhost:3000/prng", _oracle_id);
+        // Oracle(_oracle).oracleQuery("http://localhost:3000/prng", _oracle_id);
     }
 
     // We don't want routes to be minted like normal
@@ -68,6 +76,7 @@ contract Route is ERC721PresetMinterPauserAutoId, CheckAero, IOraclable {
     }
 
     function __callback(string memory value, uint256 id) external {
+        require(msg.sender == _oracleCallbackAddress, "Callback called from invalid callback address");
         emit log(value);
         require(_routesInLimbo[id] != address(0), "Invalid route callback");
         uint256 tokenId = _tokenIdTracker.current();

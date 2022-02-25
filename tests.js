@@ -8,15 +8,18 @@ const web3 = new Web3('ws://127.0.0.1:7545');
 
 // ganache keys
 const adminAccount = web3.eth.accounts.wallet.add("c2b1b5be39103b894e6b2582669a3df6048236b517f22009e315c942286616fc");
-const testAccount = web3.eth.accounts.wallet.add("175525cae816e2b48369f85a42487eb05490c61441c7b9041f7094f5cd30f666");
+const oracleAccount = web3.eth.accounts.wallet.add("175525cae816e2b48369f85a42487eb05490c61441c7b9041f7094f5cd30f666");
+const testAccount = web3.eth.accounts.wallet.add("9cbc1edc8d77d4300d6c30bda07a01a3dd3b91af5366ca6b8469d0180f9186d2");
 
-const deployContract = async (abi, bin, args) => {
+
+const deployContract = async (abi, bin, args, account) => {
     return new Promise((resolve, reject) => {
+        let acc = account === undefined ? adminAccount : account;
         const contract = new web3.eth.Contract(abi);
-        contract.deploy({ data: bin, arguments: args }).estimateGas({ from: adminAccount.address }, (err, gas) => {
+        contract.deploy({ data: bin, arguments: args }).estimateGas({ from: acc.address }, (err, gas) => {
             if (err) return console.error(err);
             contract.deploy({ data: bin, arguments: args }).send({
-                from: adminAccount.address,
+                from: acc.address,
                 gas: gas,
                 gasPrice: web3.utils.toWei('30', 'gwei')
             }, (error, transactionHash) => { /* console.dir(['sending', error, transactionHash]); */ })
@@ -34,15 +37,20 @@ const deployContract = async (abi, bin, args) => {
     });
 };
 
-const callMethod = (closure, account, amount) => {
-    return new Promise((resolve, reject) => {
-        closure.estimateGas({ from: account.address }, (err, gas) => {
+const callMethod = (closure, account, amount, nonce) => {
+    return new Promise(async (resolve, reject) => {
+        let non = nonce;
+        if (non === undefined) non = await web3.eth.getTransactionCount(account.address, "pending");
+        const value = amount === undefined ? '0' : amount;
+        closure.estimateGas({ from: account.address, nonce: non, value }, async (err, gas) => {
             if (err) return reject(err);
+            console.dir(gas);
             closure.send({
                 from: account.address,
-                gas: 200000,
+                gas: gas,
                 gasPrice: web3.utils.toWei('30', 'gwei'),
-                value: amount === undefined ? '0' : amount
+                value, // I might need this is the estimation as well
+                nonce: non
             }, (error, transactionHash) => { /* console.dir(['sending', error, transactionHash]); */ })
             .on('transactionHash', hash => { /* console.dir(['txhash', hash]); */ })
             .on('confirmation', (confirmationNumber, receipt) => {
@@ -60,9 +68,7 @@ const callMethod = (closure, account, amount) => {
 let aero = {}, airport = {}, route = {}, oracle = {};
 
 const options = {
-    filter: {
-        value: [],
-    },
+    filter: { value: [] },
     fromBlock: 0
 };
 
@@ -78,11 +84,15 @@ const addEventPrinter = (eventObject, cb) => {
             console.log(event);
             if (cb) cb(event);
         })
-        .on('changed', changed => console.log(changed))
         .on('error', err => { throw err; })
-        .on('connected', str => console.log(str));
+        // .on('changed', changed => console.log(changed))
+        // .on('connected', str => console.log(str));
 };
 
+let oracleNonce;
+
+// !!!! This does not handle stuck transactions and stuff (I will come up with a good way to handle it)
+// The concurency of transactions is messing up
 const oracleHandler = () => {
     oracle.contract.events.getValue(options)
         .on('data', async event => {
@@ -90,15 +100,15 @@ const oracleHandler = () => {
             try {
                 const contract = new web3.eth.Contract(contracts.ioraclable_abi, event.returnValues.from);
                 const res = await got(event.returnValues.what).json();
-                // console.dir(res);
-                await callMethod(contract.methods.__callback(res.toString(), event.returnValues.id), adminAccount);
+                console.log(`Using nonce of ${oracleNonce}`);
+                await callMethod(contract.methods.__callback(res.toString(), event.returnValues.id), oracleAccount, undefined, oracleNonce++);
             } catch (err) {
                 console.dir(err);
             }
         })
-        .on('changed', changed => console.dir(['changed', changed]))
-        .on('error', err => { throw err; })
-        .on('connected', str => console.dir(['connected', str]))
+        .on('error', err => { /* we might need to do something like this: nonce--; */ throw err; })
+        // .on('changed', changed => console.dir(['changed', changed]))
+        // .on('connected', str => console.dir(['connected', str]))
 };
 
 const deployContracts = async (cb) => {
@@ -106,7 +116,7 @@ const deployContracts = async (cb) => {
     aero = { address: aeroAddress, contract: new web3.eth.Contract(contracts.aero_abi, aeroAddress) };
     console.log("deployed aero");
 
-    const oracleAddress = await deployContract(contracts.oracle_abi, contracts.oracle_bin, []);
+    const oracleAddress = await deployContract(contracts.oracle_abi, contracts.oracle_bin, [], oracleAccount);
     oracle = { address: oracleAddress, contract: new web3.eth.Contract(contracts.oracle_abi, oracleAddress) };
     console.log("deployed oracle");
 
@@ -115,11 +125,13 @@ const deployContracts = async (cb) => {
     console.log("deployed airport");
     await callMethod(aero.contract.methods.setAirportAddress(airportAddress), adminAccount);
     
-    const routeAddress = await deployContract(contracts.route_abi, contracts.route_bin, ['routemetadatauri', aeroAddress, oracleAddress]);
+    const routeAddress = await deployContract(contracts.route_abi, contracts.route_bin,
+        ['routemetadatauri', aeroAddress, oracleAddress, oracleAccount.address]);
     route = { address: routeAddress, contract: new web3.eth.Contract(contracts.route_abi, routeAddress) };
     console.log("deployed route");
     await callMethod(aero.contract.methods.setRouteAddress(routeAddress), adminAccount);
-
+    
+    oracleNonce = await web3.eth.getTransactionCount(oracleAccount.address, "pending");
     oracleHandler();
 
     addEventPrinter(route.contract.events.log);
